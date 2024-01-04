@@ -1,39 +1,46 @@
 package com.voven4ek.geoalarm.services.foreground;
 
+import android.Manifest;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
+import android.media.MediaPlayer;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
-import android.os.Looper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
-import com.google.android.gms.location.LocationServices;
 import com.voven4ek.geoalarm.MainActivity;
 import com.voven4ek.geoalarm.R;
 
-public class LocationTrackerService extends Service {
+public class LocationTrackerService extends Service implements LocationListener {
     private static final String CHANNEL_ID = "LocationTracker";
     private static final String CHANNEL_NAME = "LocationService";
     private static final int NOTIFICATION_ID = 1;
     private static final String TAG = "LocationTrackerService";
+    LocationManager locationManager;
 
-    private Location mLocation;
-    private FusedLocationProviderClient mFusedLocationClient;
-    private LocationCallback mLocationCallback;
-    private LocationRequest mLocationRequest;
+    private final Location moscow = new Location("Moscow");
+
+    {
+        moscow.setLatitude(55.755826);
+        moscow.setLongitude(37.6172999);
+    }
 
     public LocationTrackerService() {
     }
@@ -41,6 +48,11 @@ public class LocationTrackerService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 10F, this);
     }
 
     @Override
@@ -61,28 +73,6 @@ public class LocationTrackerService extends Service {
         } else {
             startForeground(NOTIFICATION_ID, notification);
         }
-
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-
-        mLocationCallback = new LocationCallback() {
-            @Override
-            public void onLocationResult(@NonNull LocationResult locationResult) {
-                super.onLocationResult(locationResult);
-                Log.d(TAG, "onLocationResult: " + locationResult.getLastLocation());
-            }
-        };
-
-        createLocationRequest();
-
-        try {
-            mFusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, Looper.myLooper());
-        } catch (SecurityException unlikely) {
-            Log.e(TAG, "Lost location permission. Could not request updates. " + unlikely);
-        }
-    }
-
-    private void createLocationRequest() {
-        mLocationRequest = new LocationRequest.Builder(10000).build();
     }
 
     private void createNotificationChannel() {
@@ -97,5 +87,25 @@ public class LocationTrackerService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    @Override
+    public void onLocationChanged(@NonNull Location location) {
+        float distance = location.distanceTo(moscow);
+        Log.d(TAG, "onLocationChanged: " + distance);
+        // distance in meters
+        if (distance <= 1000) {
+            // play loud sound
+            // stop service
+            // Play loud sound
+            // Add your code here to play a loud sound
+            Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+            Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+            r.play();
+
+            // Stop service
+            stopForeground(true);
+            stopSelf();
+        }
     }
 }
