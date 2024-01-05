@@ -13,11 +13,11 @@ import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.media.MediaPlayer;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 
@@ -34,13 +34,9 @@ public class LocationTrackerService extends Service implements LocationListener 
     private static final int NOTIFICATION_ID = 1;
     private static final String TAG = "LocationTrackerService";
     LocationManager locationManager;
-
-    private final Location moscow = new Location("Moscow");
-
-    {
-        moscow.setLatitude(55.755826);
-        moscow.setLongitude(37.6172999);
-    }
+    private final Location destination = new Location("destination");
+    private final Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
+    private final Ringtone ringtone = RingtoneManager.getRingtone(getApplicationContext(), notification);
 
     public LocationTrackerService() {
     }
@@ -57,11 +53,15 @@ public class LocationTrackerService extends Service implements LocationListener 
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        startService();
+        startLocationService(intent);
         return START_STICKY;
     }
 
-    private void startService() {
+    private void startLocationService(Intent intent) {
+        Bundle bundle = intent.getExtras();
+        assert bundle != null;
+        destination.setLatitude(bundle.getDouble("latitude"));
+        destination.setLongitude(bundle.getDouble("longitude"));
         createNotificationChannel();
         Intent notificationIntent = new Intent(this, MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
@@ -73,6 +73,7 @@ public class LocationTrackerService extends Service implements LocationListener 
         } else {
             startForeground(NOTIFICATION_ID, notification);
         }
+        onLocationChanged(destination);
     }
 
     private void createNotificationChannel() {
@@ -91,21 +92,12 @@ public class LocationTrackerService extends Service implements LocationListener 
 
     @Override
     public void onLocationChanged(@NonNull Location location) {
-        float distance = location.distanceTo(moscow);
+        Log.d(TAG, "Destinition: " + destination);
+        float distance = location.distanceTo(destination);
         Log.d(TAG, "onLocationChanged: " + distance);
         // distance in meters
-        if (distance <= 1000) {
-            // play loud sound
-            // stop service
-            // Play loud sound
-            // Add your code here to play a loud sound
-            Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
-            Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
-            r.play();
-
-            // Stop service
-            stopForeground(true);
-            stopSelf();
+        if (distance <= 100000) {
+            ringtone.play();
         }
     }
 }
